@@ -1,6 +1,13 @@
 -- ==========================================
 -- 2. 云端卡密验证、日期检查与核心代码加载 (已修复搜尋與解析)
 -- ==========================================
+
+-- 補充定義缺失的 getAndAddUsageCount 函數（防止未定義報錯）
+local function getAndAddUsageCount()
+    -- 如果有本地儲存計數的需求可在此實作，這裡先回傳預設值或從配置讀取
+    return 1
+end
+
 local function verifyAndLoadCore()
     local sheetUrl = "https://docs.google.com/spreadsheets/d/17qCAfEIGhXZXc-dC33VVqsa6CbzJZ_bZKademr2y_c0/gviz/tq?tqx=out:json"
     local maxRetries = 3
@@ -62,7 +69,8 @@ local function verifyAndLoadCore()
             if not foundCard then
                 gg.toast("卡密不存在，請重新輸入！")
             elseif isExpired then
-                gg.alert("[WIG]卡密已过期！\n\n到期日期: " + expiryDateStr)
+                -- 【已修正】將原先錯誤的 '+' 字串串接改為 Lua 標準的 '..'
+                gg.alert("[WIG]卡密已过期！\n\n到期日期: " .. expiryDateStr)
                 os.exit()
             else
                 gg.toast("卡密验证成功")
