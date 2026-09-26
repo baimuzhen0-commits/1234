@@ -1,58 +1,7 @@
 -- ==========================================
--- 木子天下专属修改器 - 本地纯云端引导加载器
--- ==========================================
-
-local pcallFunc = pcall
-
--- 模拟/兼容 GG 环境 (本地测试用)
-if not gg then
-    local visFlag = false
-    gg = {
-        toast = function(msg) print("[GG提示]: " .. msg) end,
-        alert = function(msg) print("[GG弹窗]: " .. msg) end,
-        prompt = function(title, default, type) return {default[1]} end,
-        makeRequest = function(url) return {content = ""} end,
-        sleep = function() end,
-        isVisible = function() 
-            if not visFlag then visFlag = true return true end
-            return false 
-        end
-    }
-end
-
-pcallFunc(function()
-    gg.setVisible(false)
-end)
-
--- ==========================================
--- 1. 动态使用次数统计逻辑
--- ==========================================
-local function getAndAddUsageCount()
-    local countFile = gg.EXT_CACHE_DIR and (gg.EXT_CACHE_DIR .. "/muzi_usage_count.txt") or "/sdcard/muzi_usage_count.txt"
-    local currentCount = 1058
-    
-    local file = io.open(countFile, "r")
-    if file then
-        local content = file:read("*all")
-        file:close()
-        local num = tonumber(content)
-        if num then currentCount = num + 1 end
-    end
-    
-    file = io.open(countFile, "w")
-    if file then
-        file:write(tostring(currentCount))
-        file:close()
-    end
-    
-    return currentCount
-end
-
--- ==========================================
--- 2. 云端卡密验证、日期检查与核心代码加载
+-- 2. 云端卡密验证、日期检查与核心代码加载 (已修复搜尋與解析)
 -- ==========================================
 local function verifyAndLoadCore()
-    -- 已更新為你的新 Google 试算表 API 网址
     local sheetUrl = "https://docs.google.com/spreadsheets/d/17qCAfEIGhXZXc-dC33VVqsa6CbzJZ_bZKademr2y_c0/gviz/tq?tqx=out:json"
     local maxRetries = 3
     local usageCount = getAndAddUsageCount()
@@ -79,11 +28,8 @@ local function verifyAndLoadCore()
             local isExpired = true
             local expiryDateStr = "未找到有效日期"
             
-            -- 在 JSON 中寻找卡密位置
-            local cardPos = content:find('"' .. userCard .. '"')
-            if not cardPos then
-                cardPos = content:find("'" .. userCard .. "'")
-            end
+            -- 【已修正】不管是文字引號還是純數字，只要出現該卡密字串就算找到
+            local cardPos = content:find(userCard, 1, true)
             
             if cardPos then
                 foundCard = true
@@ -109,22 +55,18 @@ local function verifyAndLoadCore()
                     end
                 else
                     isExpired = true
-                    expiryDateStr = "日期格式解析失败"
+                    expiryDateStr = "卡密错误"
                 end
             end
             
             if not foundCard then
                 gg.toast("卡密不存在，請重新輸入！")
             elseif isExpired then
-                gg.alert("验证失败：该卡密已过期或日期格式不符！\n\n到期日期: " .. expiryDateStr)
+                gg.alert("[WIG]卡密已过期！\n\n到期日期: " + expiryDateStr)
                 os.exit()
             else
-                gg.toast("卡密验证成功，正在从试算表加载核心模組...")
+                gg.toast("卡密验证成功")
                 
-                -- ==========================================
-                -- 3. 从试算表提取并执行核心代码
-                -- ==========================================
-                -- 请确保你的试算表代码最上方写有 START_CORE，最下方写有 END_CORE
                 local coreStart, coreEnd = content:find("START_CORE(.-)END_CORE")
                 
                 if coreStart then
@@ -136,7 +78,7 @@ local function verifyAndLoadCore()
                     local loadedFunction, err = load(rawCoreCode)
                     if loadedFunction then
                         gg.toast("核心加载成功，欢迎使用！")
-                        loadedFunction() -- 启动核心选单
+                        loadedFunction()
                         return true
                     else
                         gg.alert("核心模組解析失敗：\n" .. tostring(err))
@@ -155,6 +97,3 @@ local function verifyAndLoadCore()
     gg.alert("错误次数过多, 验证失败, 脚本已退出。")
     os.exit()
 end
-
--- 执行云端验证与核心加载
-verifyAndLoadCore()
