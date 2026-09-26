@@ -1,22 +1,41 @@
 -- ==========================================
--- 2. 云端卡密验证与核心代码加载 (极速流畅版)
+-- 木子体系 - 云端验证与纯文字直链加载器 (简体中文版)
 -- ==========================================
 
 local function getAndAddUsageCount()
-    return 1
+    local countFile = gg.EXT_CACHE_DIR and (gg.EXT_CACHE_DIR .. "/muzi_usage_count.txt") or "/sdcard/muzi_usage_count.txt"
+    local currentCount = 1058
+    
+    local file = io.open(countFile, "r")
+    if file then
+        local content = file:read("*all")
+        file:close()
+        local num = tonumber(content)
+        if num then currentCount = num + 1 end
+    end
+    
+    file = io.open(countFile, "w")
+    if file then
+        file:write(tostring(currentCount))
+        file:close()
+    end
+    
+    return currentCount
 end
 
 local function verifyAndLoadCore()
+    -- 卡密验证表单依然使用你的 Google 试算表
     local cardSheetUrl = "https://docs.google.com/spreadsheets/d/1QxkrMH-KlAT6ybKb1tgfa7AymjyqstjFhmT0fuQoEbw/gviz/tq?tqx=out:json"
-    local codeSheetUrl = "https://docs.google.com/spreadsheets/d/17qCAfEIGhXZXc-dC33VVqsa6CbzJZ_bZKademr2y_c0/gviz/tq?tqx=out:json"
+    
+    -- 功能代码改从 GitHub 的 Raw 纯文字直鏈获取（请在这里填入你刚刚复制的 Raw 链接）
+    local codeRawUrl = "https://raw.githubusercontent.com/你的用户名/你的仓库名/main/code.lua"
     
     local maxRetries = 3
     local usageCount = getAndAddUsageCount()
     
     for i = 1, maxRetries do
-        -- 一进来或是重试时，立刻精准弹窗要求输入卡密
         local input = gg.prompt(
-            {"木子体系专属辅助：\n当前使用次数(" .. tostring(usageCount) .. ") | 剩余尝试: " .. tostring(maxRetries - i + 1)},
+            {"木子体系专属辅助：\n当前使用次数(" .. usageCount .. ") | 剩余尝试: " .. (maxRetries - i + 1)},
             {[1] = ""},
             {[1] = "text"}
         )
@@ -26,7 +45,7 @@ local function verifyAndLoadCore()
             os.exit()
         end
         
-        local userCard = tostring(input[1]):gsub("^%s*(.-)%s*$", "%1")
+        local userCard = input[1]:gsub("^%s*(.-)%s*$", "%1")
         gg.toast("正在连接云端验证卡密...")
         
         local cardResponse = gg.makeRequest(cardSheetUrl)
@@ -36,7 +55,10 @@ local function verifyAndLoadCore()
             local isExpired = true
             local expiryDateStr = "未找到有效日期"
             
-            local cardPos = cardContent:find(userCard, 1, true)
+            local cardPos = cardContent:find('"' .. userCard .. '"')
+            if not cardPos then
+                cardPos = cardContent:find("'" .. userCard .. "'")
+            end
             
             if cardPos then
                 foundCard = true
@@ -61,51 +83,42 @@ local function verifyAndLoadCore()
                     end
                 else
                     isExpired = true
-                    expiryDateStr = "卡密错误"
+                    expiryDateStr = "日期格式解析失败"
                 end
             end
             
             if not foundCard then
-                gg.toast("卡密不存在，請重新輸入！")
+                gg.toast("卡密不存在，请重新输入！")
             elseif isExpired then
-                gg.alert("[WIG]卡密已过期！\n\n到期日期: " .. expiryDateStr)
+                gg.alert("验证失败：该卡密已过期或日期格式不符！\n\n到期日期: " .. expiryDateStr)
                 os.exit()
             else
-                gg.toast("卡密验证成功，正在加载核心...")
+                gg.toast("卡密验证成功，正在下载核心代码...")
                 
-                -- 验证通过，立刻去代码表单抓取核心
-                local codeResponse = gg.makeRequest(codeSheetUrl)
+                local codeResponse = gg.makeRequest(codeRawUrl)
                 if codeResponse and codeResponse.content then
-                    local codeContent = codeResponse.content
-                    local coreStart, coreEnd = codeContent:find("START_CORE(.-)END_CORE")
+                    local rawCoreCode = codeResponse.content
                     
-                    if coreStart then
-                        local rawCoreCode = codeContent:sub(coreStart + 10, coreEnd - 9)
-                        rawCoreCode = rawCoreCode:gsub("\\n", "\n"):gsub('\\"', '"'):gsub("\\\\", "\\")
-                        
-                        local loadedFunction, err = load(rawCoreCode)
-                        if loadedFunction then
-                            gg.toast("核心加载成功，欢迎使用！")
-                            local status, runErr = pcall(loadedFunction)
-                            if not status then
-                                gg.alert("核心運行時報錯：\n" .. tostring(runErr))
-                                os.exit()
-                            end
-                            return true
-                        else
-                            gg.alert("核心模組解析失敗：\n" .. tostring(err))
+                    -- 直接加载纯文本 Lua，告别所有斜线与转义报错
+                    local loadedFunction, err = load(rawCoreCode)
+                    if loadedFunction then
+                        gg.toast("核心加载成功，欢迎使用！")
+                        local status, runErr = pcall(loadedFunction)
+                        if not status then
+                            gg.alert("核心运行时发生错误：\n" .. tostring(runErr))
                             os.exit()
                         end
+                        return true
                     else
-                        gg.alert("错误：无法在核心试算表中找到代码区块！")
+                        gg.alert("核心模块解析失败：\n" .. tostring(err))
                         os.exit()
                     end
                 else
-                    gg.toast("网络连线异常，无法下载核心代码！")
+                    gg.toast("网络连线异常，无法下载 GitHub 核心代码！")
                 end
             end
         else
-            gg.toast("网络连线异常，无法完成卡密验证！")
+            gg.toast("网络连线异常，无法完成验证！")
         end
     end
     
@@ -113,5 +126,4 @@ local function verifyAndLoadCore()
     os.exit()
 end
 
--- 直接觸發，點擊開啟時第一時間彈出輸入框
 verifyAndLoadCore()
