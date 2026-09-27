@@ -40,7 +40,7 @@ function CheckCardKey()
     
     while true do
         local input = gg.prompt(
-            {"请输入您的专属卡密（支持英文与数字）："},
+            {"木子体系专属辅助·请输入您的专属卡密 禁止盗卖 禁止二改："},
             {""},
             {"text"}
         )
@@ -55,11 +55,11 @@ function CheckCardKey()
         if userKey == "" then
             gg.toast("卡密不能为空，请重新输入！")
         else
-            gg.toast("正在连线云端资料库验证...")
+            gg.toast("验证中...")
             local response = gg.makeRequest(csvUrl)
             
             if not response or not response.content then
-                gg.toast("无法连线至云端伺服器，请检查网路！")
+                gg.toast("[WIG]机械码错误！")
                 os.exit()
             end
             
@@ -268,7 +268,7 @@ function b3()
 end
 
 local function _speed()
-    local _p = gg.prompt({"输入移速 千万不要超过1.7不然拉回卡死你、1.31几乎无拉回:"}, {[1] = "1.31"}, {[1] = "text"})
+    local _p = gg.prompt({"输入移速 千万不要超过1.4不然拉回卡死你、1.17几乎无拉回:"}, {[1] = "1.31"}, {[1] = "text"})
     if not _p then return end
     local _val = _p[1]
 
@@ -445,7 +445,7 @@ function _mainMenu()
             "打狗区",
             "防封区",
             "退出脚本"
-        }, nil, "木子体系 · 千逐核心")
+        }, nil, "木子体系 · 专属辅助 由木子团队制作 禁止盗卖 发现打死九族 禁止外发 测试版")
         
         if _choice == nil then 
             break 
